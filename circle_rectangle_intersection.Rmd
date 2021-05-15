@@ -280,11 +280,6 @@ integrate <- function (r, xy, a, b) {
     tt <- seq(0, 2*pi, length.out=10001)
     x = pmin(a[2], pmax(a[1], xy[1] - r * cos(tt)))
     y = pmin(b[2], pmax(b[1], xy[2] + r * sin(tt)))
-    # circle$direction <- ifelse(circle$x > c(circle$x[-1], circle$x[1]), 1, -1)
-    # n <- 1001
-    # xx <- seq(a[1], a[2] + 1e-8, n)
-    # k <- cut(circle$x, xx)
-    # A <- diff(xx) * tapply(circle$y * circle$direction, k, mean
     A <- sum(diff(x) * (y[-1] - diff(y)/2))
     return(A)
 }
@@ -344,6 +339,6 @@ for (k in 1:100) {
 And, the results:
 
 ```{r results}
-plot(A, iA, asp=1, xlab='analytical value', ylab='numerical integration', pch=20)
+plot(AA[,1], AA[,2], asp=1, xlab='analytical value', ylab='numerical integration', pch=20)
 abline(0, 1)
 ```
