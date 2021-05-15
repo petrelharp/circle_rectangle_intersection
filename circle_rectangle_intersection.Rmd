@@ -1,0 +1,349 @@
+---
+title: Intersections of circles and rectangles
+output: html_document
+date: `r date()`
+---
+
+```{r setup, echo=FALSE}
+fig.dim <- 4
+```
+
+We'd like to calculate the proportion of a circle that intersects a rectangle,
+specifically when the center of the circle is *inside* the rectangle
+and the axes of the rectangle are aligned with the $x$ and $y$ axes.
+
+Suppose the circle is centered at $(x, y)$ with radius $r$,
+and the rectangle edges are at $(a_1, a_2)$ with $a_1 < x < a_2$
+and $(b_1, b_2)$ with $b_1 < y < b_2$, respectively.
+We'd like to calculate the blue area,
+and will do that by calculating the hatched areas, and their intersections,
+and subtracting.
+
+```{r plot_stuff, echo=FALSE}
+crescent <- function (circle, x, side) {
+    if (side %in% c("left", "right")) {
+        circle <- circle[,2:1]
+    }
+    if (side %in% c("right", "top")) {
+        circle <- (-1) * circle
+        x <- (-1) * x
+    }
+    segs <- rle(circle[,2] <= x)
+    out <- matrix(nrow=0, ncol=2)
+    start <- 0
+    for (k in seq_along(segs$lengths)) {
+        if (segs$values[k] == TRUE) {
+            out <- rbind(circle[start + seq_len(segs$lengths[k]),], out)
+        }
+        start <- start + segs$lengths[k]
+    }
+    if (side %in% c("right", "top")) {
+        out <- (-1) * out
+    }
+    if (side %in% c("left", "right")) {
+        out <- out[,2:1]
+    }
+    return(out)
+}
+plot_intersection <- function(r, xy, a, b, outside=TRUE, inside=TRUE, rectangle=TRUE) {
+    tt <- seq(0, 2*pi, length.out=501)
+    trim_x <- function (x) pmin(a[2], pmax(a[1], x))
+    trim_y <- function (y) pmin(b[2], pmax(b[1], y))
+    circle <- cbind(xy[1] + r * cos(tt),
+                    xy[2] + r * sin(tt))
+    plot(x=a[c(1,2,2,1,1)], y=b[c(1,1,2,2,1)], type='l', lwd=2,
+         xlim=c(min(xy[1] - r, mean(a) - 1.2 * diff(a) / 2),
+                max(xy[1] + r, mean(a) + 1.2 * diff(a) / 2)),
+         ylim=c(min(xy[2] - r, mean(b) - 1.2 * diff(b) / 2),
+                max(xy[2] + r, mean(b) + 1.2 * diff(b) / 2)),
+         asp=1, xlab='', ylab='')
+    if (rectangle) {
+        polygon(x=a[c(1,2,2,1,1)], y=b[c(1,1,2,2,1)], col=grey(0.95))
+    } else {
+        polygon(x=a[c(1,2,2,1,1)], y=b[c(1,1,2,2,1)])
+    }
+    lines(circle)
+    points(xy[1], xy[2], pch=20, cex=2)
+    if (inside) {
+        polygon(trim_x(circle[,1]), trim_y(circle[,2]), col=adjustcolor('blue', 0.4))
+    }
+    if (outside) {
+        if (any(circle[,1] < a[1])) {
+            A <- crescent(circle, a[1], side='left')
+            polygon(A[,1], A[,2], density=10, angle=30)
+        }
+        if (any(circle[,1] > a[2])) {
+            A <- crescent(circle, a[2], side='right')
+            polygon(A[,1], A[,2], density=10, angle=60)
+        }
+        if (any(circle[,2] < b[1])) {
+            A <- crescent(circle, b[1], side='bottom')
+            polygon(A[,1], A[,2], density=10, angle=120)
+        }
+        if (any(circle[,2] > b[2])) {
+            A <- crescent(circle, b[2], side='top')
+            polygon(A[,1], A[,2], density=10, angle=150)
+        }
+    }
+}
+plot_intersection(3, c(2, 3), c(0, 8), c(0, 5))
+```
+
+First consider the area of a semi-circular segment, like so:
+
+```{r semicirc, echo=FALSE}
+r <- 2
+center <- c(4,4)
+b <- c(0, 5)
+theta <- 2 * acos((b[2] - center[2])/r)
+plot_intersection(r, center, c(0, 8), b, inside=FALSE)
+polygon(x=c(center[1],
+            center[1] + r * cos((pi - theta)/2),
+            center[1] - r * cos((pi - theta)/2)),
+        y=c(center[2],
+            center[2] + r * sin((pi - theta)/2),
+            center[2] + r * sin((pi - theta)/2)),
+        col=adjustcolor('red', 0.4))
+```
+
+If the distance of the center of the circle to the rectangle is $x$,
+then the angle of the bottom of the ice cream cone, $\theta$, satisfies $x = r \cos(\theta/2)$, so
+$$
+    \theta = 2 \cos^{-1}(x/r) ,
+$$
+and so the area inside the whole ice cream cone is $\pi r^2 \times (\theta / 2 \pi) = r^2 \theta / 2$.
+On the other hand, cone itself (shown above in pink)
+has width $2 x \sqrt{r^2 - x^2}$, and so
+the area of the ice cream, which is what we want, is
+$$
+    A(x) = r^2 \cos^{-1}(x/r) - x \sqrt{r^2 - x^2} .
+$$
+
+
+Next consider the area in the *overlap* of two such segments,
+as one obtains by the intersection of a circle with the corner of a rectangle.
+To do this, let $P$ be the area of the ice cream cone
+(which leans off at a precarious angle to the left in the diagram),
+$T_1$ the area of the red triangle, $T_2$ the area of the blue triangle,
+and $R$ the area of the rectangle with sides equal to the bases of the two
+triangles.
+Then the area we want (the double-hatched area below)
+is equal to $P - T_1 - T_2 + R$:
+```{r semicirc2, echo=FALSE, fig.width=2.5*fig.dim, fig.height=2*fig.dim}
+r <- 2
+center <- c(1, 4.5)
+a <- c(0, 4)
+b <- c(2, 5)
+theta12 <- acos((b[2] - center[2])/r)
+theta23 <- acos((center[1] - a[1])/r)
+theta2 <- theta12 + theta23 - pi/2
+theta1 <- theta12 - theta2
+theta3 <- theta23 - theta2
+plot_intersection(r, center, a, b, inside=FALSE)
+polygon(x=c(center[1],
+            a[1],
+            center[1] - r * cos(theta23)),
+        y=c(center[2],
+            center[2],
+            center[2] + r * sin(theta23)),
+        col=adjustcolor('blue', 0.25))
+text(x=(center[1] + a[1])/2,
+     y=center[2],
+     labels=expression(x),
+     pos=1)
+polygon(x=c(center[1],
+            center[1],
+            center[1] - r * cos(pi/2 - theta12)),
+        y=c(center[2],
+            b[2],
+            center[2] + r * sin(pi/2 - theta12)),
+        col=adjustcolor('red', 0.25))
+text(x=center[1],
+     y=(b[2]+center[2])/2,
+     labels=expression(y),
+     pos=4)
+segments(x=c(center[1], center[1] + r),
+         y=center[2])
+text(x=center[1] + r/2, y=center[2], labels=expression(r), pos=1)
+
+```
+
+This is because, if we number the areas from left-to-right, top-to-bottom as
+\begin{enumerate}
+\item[1] (double-hatched),
+\item[2] (hatched and blue),
+\item[3] (hatched and red),
+\item[4] (red and blue),
+\item[5] (red), and
+\item[6] (blue),
+\end{enumerate}
+and let $z_i$ be the area of region $i$,
+then
+$$\begin{aligned}
+    P &= z_1 + z_2 + z_3 + z_4 \\
+    T_B &= z_2 + z_4 + z_6 \\
+    T_R &= z_3 + z_4 + z_5 \\
+    R &= z_4 + z_5  + z_6 \\
+    \text{and so } P - T_1 - T_2 + R &= z_1 .
+\end{aligned}$$
+
+Now, let $x$ be the horizontal distance of the center of the circle to the vertical edge and
+$y$ the vertical distance to the horizontal edge.
+Then the angle of the vertex of the red triangle that's at the center of the circle is
+$$  \theta_R = \cos^{-1}(y/r) , $$
+and the same thing for the blue triangle is
+$$  \theta_B = \cos^{-1}(x/r) . $$
+Therefore, the angle of the base of the ice cream cone is
+$$ \theta = \theta_R + \theta_B - \pi/2, $$
+and so
+$$\begin{aligned}
+    P &= \pi r^2 \left( \frac{\theta}{2 \pi} \right) \\
+      &= \frac{r^2}{2} \left( \cos^{-1}(y/r) + \cos^{-1}(x/r) - \pi/2 \right) .
+\end{aligned}$$
+The remaining areas are easy:
+$$\begin{aligned}
+    T_B &= \frac{1}{2} x \sqrt{r^2 - x^2} \\
+    T_R &= \frac{1}{2} y \sqrt{r^2 - y^2} \\
+    R &= xy .
+\end{aligned}$$
+
+Putting it all together, we have that
+$$\begin{aligned}
+A_2(x,y)
+      &= \frac{r^2}{2} \left( \cos^{-1}(y/r) + \cos^{-1}(x/r) - \pi/2 \right)  \\
+      &\qquad  - \frac{1}{2} x \sqrt{r^2 - x^2} \\
+      &\qquad  - \frac{1}{2} y \sqrt{r^2 - y^2} \\
+      &\qquad  + xy .
+\end{aligned}$$
+
+OK, let's test this.
+To put this together into a general formula,
+we need to
+
+1. compute the area of the ice cream for each of the four possible sides,
+   if the distance to the side is less than $r$, using $A_1$,
+2. subtract off the area of each of the four possible overlaps, using $A_2$, and
+3. subtract the total from the area of the circle to find out how much is *inside* the circle.
+
+```{r the_function}
+A1 <- function (x, r) {
+    out <- 0
+    if (x < r) {
+        out <- r^2 * acos(x/r) - x * sqrt(r^2 - x^2)
+    }
+    return(out)
+}
+
+A2 <- function (x, y, r) {
+    out <- 0
+    if (x^2 + y^2 < r^2) {
+        out <- (
+                (r^2 / 2) * (acos(y/r) + acos(x/r) - pi/2)
+                - x * sqrt(r^2 - x^2) / 2
+                - y * sqrt(r^2 - y^2) / 2
+                + x * y
+               )
+    }
+    return(out)
+}
+
+area <- function (r, xy, a, b) {
+    # Find the area of the intersection of the circle centered at xy with radius r
+    # and the radius with vertical sides at a and horizontal sides at b.
+    # xy, a, and b must be vectors of length 2, and xy must lie within the rectangle.
+    stopifnot(length(xy) == 2 && length(a) == 2 && length(b) == 2)
+    x1 <- xy[1] - a[1]
+    x2 <- a[2] - xy[1]
+    y1 <- xy[2] - b[1]
+    y2 <- b[2] - xy[2]
+    stopifnot(min(x1, x2, y1, y2) >= 0)
+    A <- (
+          A1(x1, r)
+          + A1(x2, r)
+          + A1(y1, r)
+          + A1(y2, r)
+          - A2(x1, y1, r)
+          - A2(x1, y2, r)
+          - A2(x2, y1, r)
+          - A2(x2, y2, r)
+         )
+    stopifnot(A >= 0)
+    stopifnot(A <= pi * r^2)
+    return(pi * r^2 - A)
+}
+```
+
+Now the tricky part: validation.
+We'll do a Riemann integral of the area inside of the rectangle.
+```{r integral}
+integrate <- function (r, xy, a, b) {
+    tt <- seq(0, 2*pi, length.out=10001)
+    x = pmin(a[2], pmax(a[1], xy[1] - r * cos(tt)))
+    y = pmin(b[2], pmax(b[1], xy[2] + r * sin(tt)))
+    # circle$direction <- ifelse(circle$x > c(circle$x[-1], circle$x[1]), 1, -1)
+    # n <- 1001
+    # xx <- seq(a[1], a[2] + 1e-8, n)
+    # k <- cut(circle$x, xx)
+    # A <- diff(xx) * tapply(circle$y * circle$direction, k, mean
+    A <- sum(diff(x) * (y[-1] - diff(y)/2))
+    return(A)
+}
+
+# integrates circles correctly?
+for (k in 1:10) {
+    stopifnot(abs(
+        integrate(k, c(0, 0), c(-100, 100), c(-100, 100))
+        - pi * k^2
+        ) < 1e-3)
+}
+```
+
+First, let's try it on our simple examples above:
+
+```{r first_ex}
+test <- function (r, xy, a, b, plot=TRUE) {
+    A <- area(r, xy, a, b)
+    iA <- integrate(r, xy, a, b)
+    plot_intersection(r, xy, a, b)
+    mtext(sprintf("eq'n: %0.3f, integral: %0.3f", A, iA), side=3)
+    return(c(A, iA))
+}
+test(r=2, xy=c(4,4), a=c(0, 8), b=c(0, 5))
+```
+
+Looks good!!
+Now, for an intermediate:
+
+```{r second1}
+test(r=1.1, xy=c(1, 4.0), a=c(0, 4), b=c(2, 5))
+```
+
+
+Great!
+And, our second example, with positive overlap:
+
+```{r second}
+test(r=2, xy=c(1, 4.5), a=c(0, 4), b=c(2, 5))
+```
+
+Ok, now let's try it on a bunch of random circles:
+
+```{r tsts, fig.width=5*fig.dim, fig.height=5*fig.dim}
+layout(matrix(1:100, nrow=10, ncol=10))
+par(mar=c(0,0,0,0)+.1)
+AA <- matrix(NA, nrow=100, ncol=2)
+for (k in 1:100) {
+    r <- 2 * rexp(1)
+    a <- sort(runif(2, -4, 4))
+    b <- sort(runif(2, -4, 4))
+    xy <- runif(2, c(a[1], b[1]), c(a[2], b[2]))
+    AA[k,] <- test(r=r, xy=xy, a=a, b=b)
+}
+```
+
+And, the results:
+
+```{r results}
+plot(A, iA, asp=1, xlab='analytical value', ylab='numerical integration', pch=20)
+abline(0, 1)
+```
