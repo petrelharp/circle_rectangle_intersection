@@ -1,0 +1,75 @@
+---
+title: Area of a Gaussian inside of a rectangle.
+output: html_document
+date: `r date()`
+---
+
+```{r setup, echo=FALSE}
+fig.dim <- 4
+```
+
+We'd like to calculate the proportion of a standard multivariate Gaussian
+that lies within a rectangle, specifically when the covariance matrix is a constant
+times the identity.
+We will skip the maxDistance part, since we don't have it implemented right.
+Since the coordinates are independent, this is easy:
+
+```{r the_function}
+# copied from Eidos
+area <- function(x, y, ab, sigma, maxDistance=5*sigma) {
+   A = rep(1.0, length(x));
+   nearby = (
+         ((x - ab[1]) < maxDistance) |
+         ((ab[3] - x) < maxDistance) |
+         ((y - ab[2]) < maxDistance) |
+         ((ab[4] - y) < maxDistance)
+     )
+   A[nearby] = (A[nearby] * 
+        (pnorm(x[nearby], ab[1], sigma) - pnorm(x[nearby], ab[3], sigma)) * 
+        (pnorm(y[nearby], ab[2], sigma) - pnorm(y[nearby], ab[4], sigma))
+       )
+   return(A);
+}
+```
+
+Now let's test it, by Monte Carlo:
+```{r test_fn}
+test_area <- function(x, y, ab, sigma) {
+    nreps <- 1e5
+    A <- rep(NA, length(x))
+    for (k in 1:length(x)) {
+        zz <- cbind(
+                rnorm(nreps, mean=x[k], sd=sigma),
+                rnorm(nreps, mean=y[k], sd=sigma)
+              )
+        A[k] <- mean(
+                   (zz[,1] >= ab[1])
+                   & (zz[,1] <= ab[3])
+                   & (zz[,2] >= ab[2])
+                   & (zz[,2] <= ab[4])
+                )
+    }
+    return(A)
+}
+```
+
+And, the random tests:
+```{r testit}
+nreps <- 20
+ntimes <- 30
+AA <- matrix(NA, nrow=nreps * ntimes, ncol=2)
+i <- 0
+for (k in 1:ntimes) {
+    a <- sort(runif(2, -4, 4))
+    b <- sort(runif(2, -4, 4))
+    ab <- c(a[1], b[1], a[2], b[2])
+    x <- runif(nreps, ab[1], ab[3])
+    y <- runif(nreps, ab[2], ab[4])
+    sigma <- 0.02
+    AA[i + (1:nreps),1] <- area(x, y, ab, sigma)
+    AA[i + (1:nreps),2] <- test_area(x, y, ab, sigma)
+    i <- i + nreps
+}
+plot(AA, asp=1, xlab='analytical', ylab='monte carlo', pch=20)
+abline(0, 1)
+```
